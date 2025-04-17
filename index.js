@@ -14,8 +14,10 @@ app.use((req, res, next) => {
 // ✅ /favicon.ico 요청 차단
 app.get('/favicon.ico', (req, res) => res.status(204).end());
 
-// ✅ /favicon.png 요청 차단
-app.get('/favicon.png', (req, res) => res.status(204).end());
+// ✅ 루트 경로("/")에 대한 기본 응답
+app.get('/', (req, res) => {
+  res.send('Seoul Living Proxy API is running!');
+});
 
 // ✅ /population 엔드포인트: 자치구 생활인구 조회
 app.get('/population', async (req, res) => {
