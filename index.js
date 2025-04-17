@@ -1,13 +1,9 @@
-const express = require("express");
-const axios = require("axios");
-const dotenv = require("dotenv");
-const app = express();
+const express = require('express');
+const axios = require('axios');
+const dotenv = require('dotenv');
 
 dotenv.config();
-
-// ✅ 환경변수에서 API 키 로딩
-const API_KEY = process.env.SEOUL_API_KEY || "4d5a494e5a736d61373461474e4743";
-const BASE_URL = "http://openapi.seoul.go.kr:8088";
+const app = express();
 
 // ✅ CORS 허용 (GPT에서 호출 가능하게)
 app.use((req, res, next) => {
@@ -15,35 +11,13 @@ app.use((req, res, next) => {
   next();
 });
 
-
-// ✅ 기존: /seoul-living 라우터
-app.get("/seoul-living", async (req, res) => {
-  const { startIndex = 1, endIndex = 100, startDate, endDate, dongCode } = req.query;
-
-  let url = `${BASE_URL}/${API_KEY}/json/LivingPopulation/${startIndex}/${endIndex}`;
-  const params = new URLSearchParams();
-
-  if (startDate) params.append("startDate", startDate);
-  if (endDate) params.append("endDate", endDate);
-  if (dongCode) params.append("dongCode", dongCode);
-
-  const fullUrl = params.toString() ? `${url}?${params.toString()}` : url;
-
-  try {
-    const response = await axios.get(fullUrl);
-    res.status(200).json(response.data);
-  } catch (error) {
-    console.error("Error fetching from Seoul OpenAPI:", error.message);
-    res.status(500).json({ error: "Failed to fetch data from Seoul API" });
-  }
-});
-
-
-// ✅ 추가: /population 생활인구 프록시
+// ✅ /population 엔드포인트: 자치구 생활인구 조회
 app.get('/population', async (req, res) => {
   const { startIndex, endIndex, baseDate, GU_NM, TIME_SLOT } = req.query;
 
-  let url = `${BASE_URL}/${API_KEY}/json/SPOP_DAILYSUM_JACHI/${startIndex}/${endIndex}/${baseDate}`;
+  const API_KEY = process.env.SEOUL_API_KEY || "4d5a494e5a736d61373461474e4743";
+  let url = `http://openapi.seoul.go.kr:8088/${API_KEY}/json/SPOP_DAILYSUM_JACHI/${startIndex}/${endIndex}/${baseDate}`;
+
   const params = [];
   if (GU_NM) params.push(`GU_NM=${encodeURIComponent(GU_NM)}`);
   if (TIME_SLOT) params.push(`TIME_SLOT=${encodeURIComponent(TIME_SLOT)}`);
@@ -53,13 +27,21 @@ app.get('/population', async (req, res) => {
     const response = await axios.get(url);
     const raw = response.data?.SPOP_DAILYSUM_JACHI?.row || [];
 
+    // ✅ GU_NM 보정: "동대문" → "동대문구"
+    let fixedGU = GU_NM;
+    if (GU_NM && !GU_NM.endsWith("구")) {
+      fixedGU = GU_NM + "구";
+    }
+
     const filtered = raw.filter(item => {
-      const matchGU = GU_NM
-        ? item.GU_NM?.includes(GU_NM) || item.SIGNGU_NM?.includes(GU_NM)
+      const matchGU = fixedGU
+        ? item.GU_NM?.includes(fixedGU) || item.SIGNGU_NM?.includes(fixedGU)
         : true;
+
       const matchTime = TIME_SLOT
         ? item.TIME_SLOT === TIME_SLOT
         : true;
+
       return matchGU && matchTime;
     });
 
@@ -74,20 +56,32 @@ app.get('/population', async (req, res) => {
       return res.status(200).json({
         success: false,
         status: "NO_DATA",
-        message: "해당 날짜와 시간의 생활인구 데이터가 없습니다.",
+        message: "요청하신 조건에 해당하는 생활인구 데이터가 없습니다.",
         result: []
       });
     }
 
-    res.status(200).json({
+    // ✅ 첫 번째 결과 기반 요약 메시지 생성
+    const first = result[0];
+    const date = first.BASE_DATE;
+    const gu = first.GU_NM;
+    const time = first.TIME_SLOT;
+    const count = Number(first.TOT_LVPOP_CO).toLocaleString();
+
+    const msg = time
+      ? `${date} 기준 ${gu} ${time}시의 생활인구는 약 ${count}명입니다.`
+      : `${date} 기준 ${gu} 전체 생활인구는 약 ${count}명입니다.`;
+
+    return res.status(200).json({
       success: true,
       status: "OK",
-      message: "생활인구 데이터 조회 성공",
+      message: msg,
       result
     });
 
   } catch (error) {
-    res.status(500).json({
+    console.error("서울 열린데이터 API 호출 오류:", error.message);
+    return res.status(500).json({
       success: false,
       status: "ERROR",
       message: "서울열린데이터 API 호출 중 오류가 발생했습니다.",
@@ -95,7 +89,6 @@ app.get('/population', async (req, res) => {
     });
   }
 });
-
 
 // ✅ 서버 시작
 const PORT = process.env.PORT || 3000;
