@@ -66,7 +66,7 @@ app.get('/population', async (req, res) => {
     const date = first.BASE_DATE;
     const gu = first.GU_NM;
     const time = first.TIME_SLOT;
-    const count = Number(first.TOT_LVPOP_CO).toLocaleString();
+    const count = Math.round(Number(first.TOT_LVPOP_CO)).toLocaleString();
 
     const msg = time
       ? `${date} 기준 ${gu} ${time}시의 생활인구는 약 ${count}명입니다.`
