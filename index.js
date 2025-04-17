@@ -14,6 +14,9 @@ app.use((req, res, next) => {
 // ✅ /favicon.ico 요청 차단
 app.get('/favicon.ico', (req, res) => res.status(204).end());
 
+// ✅ /favicon.png 요청 차단
+app.get('/favicon.png', (req, res) => res.status(204).end());
+
 // ✅ /population 엔드포인트: 자치구 생활인구 조회
 app.get('/population', async (req, res) => {
   const { startIndex, endIndex, baseDate, GU_NM, TIME_SLOT } = req.query;
