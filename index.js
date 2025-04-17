@@ -16,7 +16,7 @@ app.get('/favicon.ico', (req, res) => res.status(204).end());
 
 // ✅ 루트 경로("/")에 대한 기본 응답
 app.get('/', (req, res) => {
-  res.send('Seoul Living Proxy API is running!');
+  res.send('서울 생활인구 프록시 서버에 오신 것을 환영합니다!');
 });
 
 // ✅ /population 엔드포인트: 자치구 생활인구 조회
